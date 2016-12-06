@@ -34,6 +34,9 @@ setup:
 	rm -rf $(TEST_DIR)
 	mkdir -p $(TEST_DIR)
 
+yaml_file:
+	(cd targets/yaml_file && ./runme.sh $(TEST_FLAGS))
+
 cloud: amazon rackspace azure
 
 cloud_cleanup: amazon_cleanup rackspace_cleanup
