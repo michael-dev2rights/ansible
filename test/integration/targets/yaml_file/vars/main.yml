@@ -1,3 +1,7 @@
 random_token: abc123
 big_number: 49201455582
-
+boolean_reader_test:
+  true_value: true
+  yes_value: yes
+  quoted_yes_value: "yes"
+  null_value: null
