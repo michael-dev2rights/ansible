@@ -94,8 +94,13 @@ class RDSDBInstance(object):
         before = dict()
         after = dict()
         for k in compare_keys:
+<<<<<<< 40a475eba96f207a5725a23288204fa53c7c5007
             if self.params.get(k) != params.get(k):
                 before[k] = self.params.get(k)
+=======
+            if self.instance.get(k) != params.get(k):
+                before[k] = self.instance.get(k)
+>>>>>>> RDS: split into more sensible modules
                 after[k] = params.get(k)
         port = self.data.get('port')
         if port != params.get('port'):
@@ -104,6 +109,7 @@ class RDSDBInstance(object):
         result = dict()
         if before:
             result = dict(before_header=self.name, before=before, after=after)
+<<<<<<< 40a475eba96f207a5725a23288204fa53c7c5007
             result['after_header'] = params.get('new_instance_name', params.get('instance_name'))
         return result
 
