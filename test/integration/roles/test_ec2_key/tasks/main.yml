@@ -50,7 +50,7 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("value of region must be one of:")'
+       - '"If the region definitely exists" in result.msg'
 
 # ============================================================
 - name: test valid region parameter
@@ -126,7 +126,7 @@
   assert:
     that:
        - 'result.failed'
-       - '"EC2ResponseError: 401 Unauthorized" in result.msg'
+       - '"rejected key operation" in result.msg'
 
 # ============================================================
 - name: test credential parameters
@@ -142,7 +142,7 @@
   assert:
     that:
        - 'result.failed'
-       - '"EC2ResponseError: 401 Unauthorized" in result.msg'
+       - '"rejected key operation" in result.msg'
 
 # ============================================================
 - name: test state=absent with key_material

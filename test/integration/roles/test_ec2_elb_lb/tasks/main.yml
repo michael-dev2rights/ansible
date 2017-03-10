@@ -263,7 +263,7 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("value of region must be one of:")'
+       - '"If the region definitely exists" in result.msg'
 
 
 # ============================================================

@@ -74,7 +74,7 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("Region asdf querty 1234 does not seem to be available for aws module boto.ec2. If the region definitely exists, you may need to upgrade boto or extend with endpoints_path")'
+       - '"If the region definitely exists" in result.msg'
 
 # ============================================================
 - name: test valid region parameter
