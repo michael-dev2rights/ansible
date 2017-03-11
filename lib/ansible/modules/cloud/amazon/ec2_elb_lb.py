@@ -677,7 +677,12 @@ class ElbManager(object):
 
     @_throttleable_operation(_THROTTLING_RETRIES)
     def _get_elb(self):
-        elbs = self.elb_conn.get_all_load_balancers()
+        try:
+            elbs = self.elb_conn.get_all_load_balancers()
+        except boto.exception.BotoServerError as err:
+            self.module.fail_json(msg="AWS rejected listing load balancers - " + str(err),
+                                  exception=traceback.format_exc() )
+
         for elb in elbs:
             if self.name == elb.name:
                 self.status = 'ok'
@@ -707,12 +712,17 @@ class ElbManager(object):
 
     def _create_elb(self):
         listeners = [self._listener_as_tuple(l) for l in self.listeners]
-        self.elb = self.elb_conn.create_load_balancer(name=self.name,
-                                                      zones=self.zones,
-                                                      security_groups=self.security_group_ids,
-                                                      complex_listeners=listeners,
-                                                      subnets=self.subnets,
-                                                      scheme=self.scheme)
+        try:
+            self.elb = self.elb_conn.create_load_balancer(name=self.name,
+                                                          zones=self.zones,
+                                                          security_groups=self.security_group_ids,
+                                                          complex_listeners=listeners,
+                                                          subnets=self.subnets,
+                                                          scheme=self.scheme)
+        except boto.exception.BotoServerError as err:
+            self.module.fail_json(msg="AWS rejected load balancer create operation - " + str(err),
+                                  exception=traceback.format_exc() )
+
         if self.elb:
             # HACK: Work around a boto bug in which the listeners attribute is
             # always set to the listeners argument to create_load_balancer, and
@@ -835,7 +845,8 @@ class ElbManager(object):
             if "Invalid Availability Zone" in e.error_message:
                 self.module.fail_json(msg=e.error_message)
             else:
-                self.module.fail_json(msg="an unknown server error occurred, please try again later")
+                self.module.fail_json(msg="an unknown server error occurred, please try again later",
+                                      exception=traceback.format_exc())
         self.changed = True
 
     def _disable_zones(self, zones):
@@ -845,7 +856,9 @@ class ElbManager(object):
             if "Invalid Availability Zone" in e.error_message:
                 self.module.fail_json(msg=e.error_message)
             else:
-                self.module.fail_json(msg="an unknown server error occurred, please try again later")
+                self.module.fail_json(msg="an unknown server error occurred, please try again later",
+                                      exception=traceback.format_exc())
+
         self.changed = True
 
     def _attach_subnets(self, subnets):
@@ -921,7 +934,11 @@ class ElbManager(object):
                     update_health_check = True
 
             if update_health_check:
-                self.elb.configure_health_check(self.elb.health_check)
+                try:
+                    self.elb.configure_health_check(self.elb.health_check)
+                except boto.exception.BotoServerError as err:
+                    self.module.fail_json(msg="AWS rejected configuring health check on LB - " + str(err),
+                                          exception=traceback.format_exc() )
                 self.changed = True
 
     def _check_attribute_support(self, attr):
@@ -967,7 +984,11 @@ class ElbManager(object):
             self.elb_conn.modify_lb_attribute(self.name, 'AccessLog', attributes.access_log)
 
     def _set_connection_draining_timeout(self):
-        attributes = self.elb.get_attributes()
+        try:
+            attributes = self.elb.get_attributes()
+        except boto.exception.BotoServerError as err:
+            self.module.fail_json(msg="AWS rejected listing load balancer attributes - " + STR996(err),
+                                  exception=traceback.format_exc() )
         if self.connection_draining_timeout is not None:
             if not attributes.connection_draining.enabled or \
                     attributes.connection_draining.timeout != self.connection_draining_timeout:
@@ -979,7 +1000,11 @@ class ElbManager(object):
             if attributes.connection_draining.enabled:
                 self.changed = True
             attributes.connection_draining.enabled = False
-            self.elb_conn.modify_lb_attribute(self.name, 'ConnectionDraining', attributes.connection_draining)
+            try:
+                self.elb_conn.modify_lb_attribute(self.name, 'ConnectionDraining', attributes.connection_draining)
+            except boto.exception.BotoServerError as err:
+                self.module.fail_json(msg="AWS rejected modifying attributes on LB - " + str(err),
+                                      exception=traceback.format_exc() )
 
     def _set_idle_timeout(self):
         attributes = self.elb.get_attributes()
