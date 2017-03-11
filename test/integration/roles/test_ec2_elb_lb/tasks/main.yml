@@ -253,9 +253,16 @@
 # ============================================================
 - name: test invalid region parameter
   ec2_elb_lb:
-    name="{{ tag_prefix }}"
-    region='asdf querty 1234'
-    state=present
+    name: "{{ tag_prefix }}"
+    region: 'asdf querty 1234'
+    state: present
+    zones:
+      - us-east-1a
+      - us-east-1d
+    listeners:
+      - protocol: http
+        load_balancer_port: 80
+        instance_port: 80
   register: result
   ignore_errors: true
 
