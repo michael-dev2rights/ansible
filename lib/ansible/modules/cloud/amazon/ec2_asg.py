@@ -334,7 +334,7 @@ def elb_dreg(asg_connection, module, group_name, instance_id):
         try:
             elb_connection = connect_to_aws(boto.ec2.elb, region, **aws_connect_params)
         except boto.exception.NoAuthHandlerFound as e:
-            module.fail_json(msg=str(e))
+            module.fail_json(msg=str(e), exception=traceback.format_exc())
     else:
         return
 
@@ -378,7 +378,7 @@ def elb_healthy(asg_connection, elb_connection, module, group_name):
             if e.error_code == 'InvalidInstance':
                 return None
 
-            module.fail_json(msg=str(e))
+            module.fail_json(msg=str(e), exception=traceback.format_exc() )
 
         for i in lb_instances:
             if i.state == "InService":
@@ -400,7 +400,7 @@ def wait_for_elb(asg_connection, module, group_name):
         try:
             elb_connection = connect_to_aws(boto.ec2.elb, region, **aws_connect_params)
         except boto.exception.NoAuthHandlerFound as e:
-            module.fail_json(msg=str(e))
+            module.fail_json(msg=str(e), exception=traceback.format_exc())
 
         wait_timeout = time.time() + wait_timeout
         healthy_instances = elb_healthy(asg_connection, elb_connection, module, group_name)
@@ -462,7 +462,7 @@ def create_autoscaling_group(connection, module):
         try:
             ec2_connection = connect_to_aws(boto.ec2, region, **aws_connect_params)
         except (boto.exception.NoAuthHandlerFound, AnsibleAWSError) as e:
-            module.fail_json(msg=str(e))
+            module.fail_json(msg=str(e), exception=traceback.format_exc())
     elif vpc_zone_identifier:
         vpc_zone_identifier = ','.join(vpc_zone_identifier)
 
@@ -928,7 +928,11 @@ def main():
     if state == 'present':
         create_changed, asg_properties=create_autoscaling_group(connection, module)
     elif state == 'absent':
-        changed = delete_autoscaling_group(connection, module)
+        try:
+            changed = delete_autoscaling_group(connection, module)
+        except boto.exception.BotoServerError as err:
+            module.fail_json(msg="AWS failed deleting autoscaling group - " + str(err),
+                             exception=traceback.format_exc() )
         module.exit_json( changed = changed )
     if replace_all_instances or replace_instances:
         replace_changed, asg_properties=replace(connection, module)

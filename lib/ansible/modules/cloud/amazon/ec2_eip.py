@@ -278,7 +278,7 @@ def find_device(ec2, module, device_id, isinstance=True):
         try:
             reservations = ec2.get_all_reservations(instance_ids=[device_id])
         except boto.exception.EC2ResponseError as e:
-            module.fail_json(msg=str(e))
+            module.fail_json(msg=str(e), exception=traceback.format_exc())
 
         if len(reservations) == 1:
             instances = reservations[0].instances
@@ -288,7 +288,7 @@ def find_device(ec2, module, device_id, isinstance=True):
         try:
             interfaces = ec2.get_all_network_interfaces(network_interface_ids=[device_id])
         except boto.exception.EC2ResponseError as e:
-            module.fail_json(msg=str(e))
+            module.fail_json(msg=str(e), exception=traceback.format_exc())
 
         if len(interfaces) == 1:
             return interfaces[0]
@@ -428,7 +428,7 @@ def main():
                 result = {'changed': released['changed'], 'disassociated': {'changed': False}, 'released': released}
 
     except (boto.exception.EC2ResponseError, EIPException) as e:
-        module.fail_json(msg=str(e))
+        module.fail_json(msg=str(e), exception=traceback.format_exc())
 
     if instance_id:
         result['warnings'] = warnings
