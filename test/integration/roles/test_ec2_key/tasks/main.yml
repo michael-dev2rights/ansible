@@ -249,7 +249,7 @@
     name='{{ec2_key_name}}'
     state=present
     key_material='{{ item }}'
-  with_file: sshkey ~ '.pub'
+  with_file: '{{sshkey}}.pub'
   environment:
     EC2_REGION: '{{ec2_region}}'
     EC2_ACCESS_KEY: '{{ec2_access_key}}'
@@ -277,7 +277,7 @@
     name='{{ec2_key_name}}'
     state=present
     key_material='{{ item }}'
-  with_file: sshkey ~ '.pub'
+  with_file: '{{sshkey}}.pub'
   environment:
     EC2_REGION: '{{ec2_region}}'
     EC2_ACCESS_KEY: '{{ec2_access_key}}'
