@@ -248,21 +248,21 @@ def main():
                 else:
                     module.exit_json(changed=changed)
             except BotoServerError as e:
-                module.fail_json(msg=e)
+                module.fail_json(msg=str(e), exception=traceback.format_exc() )
 
         if dhcp_id is not None:
             try:
                 if update_dhcp_opts(connection, module, vpc_obj, dhcp_id):
                     changed = True
             except BotoServerError as e:
-                module.fail_json(msg=e)
+                module.fail_json(msg=str(e), exception=traceback.format_exc() )
 
         if tags is not None or name is not None:
             try:
                 if update_vpc_tags(connection, module, vpc_obj, tags, name):
                     changed = True
             except BotoServerError as e:
-                module.fail_json(msg=e)
+                module.fail_json(msg=str(e), exception=traceback.format_exc() )
 
         # Note: Boto currently doesn't currently provide an interface to ec2-describe-vpc-attribute
         # which is needed in order to detect the current status of DNS options. For now we just update
