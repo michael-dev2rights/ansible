@@ -681,7 +681,7 @@ class ElbManager(object):
             elbs = self.elb_conn.get_all_load_balancers()
         except boto.exception.BotoServerError as err:
             self.module.fail_json(msg="AWS rejected listing load balancers - " + str(err),
-                                  exception=traceback.format_exc() )
+                                  exception=traceback.format_exc())
 
         for elb in elbs:
             if self.name == elb.name:
@@ -721,7 +721,7 @@ class ElbManager(object):
                                                           scheme=self.scheme)
         except boto.exception.BotoServerError as err:
             self.module.fail_json(msg="AWS rejected load balancer create operation - " + str(err),
-                                  exception=traceback.format_exc() )
+                                  exception=traceback.format_exc())
 
         if self.elb:
             # HACK: Work around a boto bug in which the listeners attribute is
@@ -938,7 +938,7 @@ class ElbManager(object):
                     self.elb.configure_health_check(self.elb.health_check)
                 except boto.exception.BotoServerError as err:
                     self.module.fail_json(msg="AWS rejected configuring health check on LB - " + str(err),
-                                          exception=traceback.format_exc() )
+                                          exception=traceback.format_exc())
                 self.changed = True
 
     def _check_attribute_support(self, attr):
@@ -987,8 +987,8 @@ class ElbManager(object):
         try:
             attributes = self.elb.get_attributes()
         except boto.exception.BotoServerError as err:
-            self.module.fail_json(msg="AWS rejected listing load balancer attributes - " + STR996(err),
-                                  exception=traceback.format_exc() )
+            self.module.fail_json(msg="AWS rejected listing load balancer attributes - " + str(err),
+                                  exception=traceback.format_exc())
         if self.connection_draining_timeout is not None:
             if not attributes.connection_draining.enabled or \
                     attributes.connection_draining.timeout != self.connection_draining_timeout:
@@ -1004,7 +1004,7 @@ class ElbManager(object):
                 self.elb_conn.modify_lb_attribute(self.name, 'ConnectionDraining', attributes.connection_draining)
             except boto.exception.BotoServerError as err:
                 self.module.fail_json(msg="AWS rejected modifying attributes on LB - " + str(err),
-                                      exception=traceback.format_exc() )
+                                      exception=traceback.format_exc())
 
     def _set_idle_timeout(self):
         attributes = self.elb.get_attributes()

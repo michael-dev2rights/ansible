@@ -379,7 +379,7 @@ def get_nat_gateways(client, subnet_id=None, nat_gateway_id=None,
                 gateways = client.describe_nat_gateways(**params)['NatGateways']
             except boto.exception.EC2ResponseError as err:
                 module.fail_json(msg="AWS rejected key operation - " + str(err),
-                                 exception=traceback.format_exc() )
+                                 exception=traceback.format_exc())
             if gateways:
                 for gw in gateways:
                     existing_gateways.append(convert_to_lower(gw))

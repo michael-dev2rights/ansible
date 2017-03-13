@@ -378,7 +378,7 @@ def elb_healthy(asg_connection, elb_connection, module, group_name):
             if e.error_code == 'InvalidInstance':
                 return None
 
-            module.fail_json(msg=str(e), exception=traceback.format_exc() )
+            module.fail_json(msg=str(e), exception=traceback.format_exc())
 
         for i in lb_instances:
             if i.state == "InService":
@@ -932,7 +932,7 @@ def main():
             changed = delete_autoscaling_group(connection, module)
         except boto.exception.BotoServerError as err:
             module.fail_json(msg="AWS failed deleting autoscaling group - " + str(err),
-                             exception=traceback.format_exc() )
+                             exception=traceback.format_exc())
         module.exit_json( changed = changed )
     if replace_all_instances or replace_instances:
         replace_changed, asg_properties=replace(connection, module)

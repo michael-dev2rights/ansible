@@ -157,7 +157,7 @@ def main():
         key = ec2.get_key_pair(name)
     except boto.exception.EC2ResponseError as err:
         module.fail_json(msg="AWS rejected key operation - " + str(err),
-                         exception=traceback.format_exc() )
+                         exception=traceback.format_exc())
 
     # Ensure requested key is absent
     if state == 'absent':
