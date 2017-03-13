@@ -375,7 +375,11 @@ def get_nat_gateways(client, subnet_id=None, nat_gateway_id=None,
 
     try:
         if not check_mode:
-            gateways = client.describe_nat_gateways(**params)['NatGateways']
+            try:
+                gateways = client.describe_nat_gateways(**params)['NatGateways']
+            except boto.exception.EC2ResponseError as err:
+                module.fail_json(msg="AWS rejected key operation - " + str(err),
+                                 exception=traceback.format_exc() )
             if gateways:
                 for gw in gateways:
                     existing_gateways.append(convert_to_lower(gw))
@@ -784,7 +788,6 @@ def create(client, subnet_id, allocation_id, client_token=None,
 
     return success, changed, err_msg, result
 
-
 def pre_create(client, subnet_id, allocation_id=None, eip_address=None,
                if_exist_do_not_create=False, wait=False, wait_timeout=0,
                client_token=None, check_mode=False):
@@ -1054,6 +1057,8 @@ def main():
         )
     except botocore.exceptions.ClientError as e:
         module.fail_json(msg="Boto3 Client Error - " + str(e.msg))
+    except botocore.exceptions.NoRegionError:
+        module.fail_json(msg="region must be specified")
 
     changed = False
     err_msg = ''
