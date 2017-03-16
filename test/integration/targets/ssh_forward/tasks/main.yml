@@ -1,0 +1,76 @@
+# Test code for the ssh_tunnel module
+# (c) 2017, Michael De La Rue
+
+# This file is part of Ansible
+#
+# Ansible is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Ansible is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
+
+
+- name: Generate local and remote ports
+  set_fact:
+    local_port: "4{{port_gen}}"
+    remote_port: "5{{port_gen}}"
+
+- name: create randomly named file
+  shell: mktemp /tmp/netcatout.XXXXXX
+  register: mktemp_res
+  tags:
+    - prepare
+
+- name: register file name
+  set_fact:
+    netcatout: "{{mktemp_res.stdout}}"
+
+- name: Given that I have a netcat listening on a local port and dumping to a file
+  shell: "pkill -f '^nc .* {{remote_port}}$'; nc -l 127.0.0.1 {{remote_port}} > {{netcatout}} &"
+
+- name: And that no process is using port {{local_port}}
+  shell: "fuser -k {{local_port}}/tcp ; ! fuser {{local_port}}/tcp"
+
+- name: When I start an SSH tunnel to forwarding localhost
+  ssh_forward:
+     local_address: localhost
+     remote_address: localhost
+     local_port: "{{local_port}}"
+     remote_port: "{{remote_port}}"
+
+- name: And I send secret data to the forwarded port
+  shell: "echo the secret data | nc 127.0.0.1 {{local_port}}      "
+
+- name: debug file
+  debug:
+    msg: "file is {{netcatout}}"
+
+- name: Then the secret data should already be in the file
+  copy:
+    dest: "{{netcatout}}"
+    content: "the secret data\n"
+  register: copy_result
+  check_mode: yes
+
+- name: Assert that the previous check passed
+  assert:
+    that:
+      - "copy_result.changed == false"
+
+- name: When I stop the SSH forward
+  shell: "fuser -k {{local_port}}/tcp"
+
+- name: Then no process shoud be using port {{local_port}}
+  shell: "! fuser {{local_port}}/tcp"
+
+- name: Assert that the previous check passed
+  assert:
+    that:
+      - "copy_result.changed == false"

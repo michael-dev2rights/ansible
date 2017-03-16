@@ -1,0 +1,11 @@
+---
+- hosts: localhost
+  gather_facts: no
+  connection: local
+
+  vars:
+    limit_to: "*"
+    debug: false
+
+  roles:
+    - { role: ssh_forward, when: "limit_to in ['*', 'ssh_forward']" }
