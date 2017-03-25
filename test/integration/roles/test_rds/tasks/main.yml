@@ -12,10 +12,10 @@
     instance_name: "rds-XYZ-{{ random_string }}"
     state: absent
 
-- name: ensure non-existent snapshot is not present
-  rds_snapshot:
-    snapshot: "snapshot-XYZ-{{ random_string }}"
-    state: absent
+# - name: ensure non-existent snapshot is not present
+#   rds_snapshot:
+#     snapshot: "snapshot-XYZ-{{ random_string }}"
+#     state: absent
 
 - name: create rds instance
   rds_instance:
@@ -32,24 +32,24 @@
   debug:
     var: rds_instance
 
-- name: get instance facts
-  rds_facts:
-    instance_name: "{{ instance_name }}"
+# - name: get instance facts
+#   rds_facts:
+#     instance_name: "{{ instance_name }}"
 
-- name: snapshot instance
-  rds_snapshot:
-    instance_name: "{{ instance_name }}"
-    snapshot: "{{ instance_name }}-snapshot"
-    wait: yes
+# - name: snapshot instance
+#   rds_snapshot:
+#     instance_name: "{{ instance_name }}"
+#     snapshot: "{{ instance_name }}-snapshot"
+#     wait: yes
 
-- name: get instance facts
-  rds_facts:
-    snapshot: "{{ instance_name }}-snapshot"
+# - name: get instance facts
+#   rds_facts:
+#     snapshot: "{{ instance_name }}-snapshot"
 
-- name: delete snapshot
-  rds_snapshot:
-    snapshot: "{{ instance_name }}-snapshot"
-    state: absent
+# - name: delete snapshot
+#   rds_snapshot:
+#     snapshot: "{{ instance_name }}-snapshot"
+#     state: absent
 
 - name: modify rds instance
   rds_instance:
