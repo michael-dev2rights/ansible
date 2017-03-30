@@ -162,6 +162,8 @@ try:
 except ImportError:
     HAS_BOTO = False
 
+import traceback
+
 
 class EIPException(Exception):
     pass

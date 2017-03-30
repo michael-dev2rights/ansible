@@ -109,6 +109,8 @@ try:
 except ImportError:
     HAS_BOTO=False
 
+import traceback
+
 def boto_exception(err):
     '''generic error message handler'''
     if hasattr(err, 'error_message'):

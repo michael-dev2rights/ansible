@@ -117,6 +117,7 @@ try:
 except ImportError:
     HAS_BOTO = False
 
+import traceback
 from ansible.module_utils._text import to_bytes
 import random
 import string

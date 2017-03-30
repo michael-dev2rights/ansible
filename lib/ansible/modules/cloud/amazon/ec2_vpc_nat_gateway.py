@@ -213,6 +213,7 @@ nat_gateway_addresses:
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.ec2 import ec2_argument_spec, get_aws_connection_info, boto3_conn
 
+import traceback
 import datetime
 import random
 import re
