@@ -131,9 +131,10 @@ EXAMPLES = '''
 '''
 
 import re
+import traceback
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.ec2 import AnsibleAWSError, connect_to_aws, ec2_argument_spec, get_aws_connection_info
+from ansible.module_utils.ec2 import AnsibleAWSError, connect_to_aws, ec2_argument_spec, get_aws_connection_info, camel_dict_to_snake_dict
 
 try:
     import boto.ec2
@@ -472,7 +473,9 @@ def ensure_route_table_absent(connection, module):
             try:
                 route_table = get_route_table_by_tags(connection, vpc_id, tags)
             except EC2ResponseError as e:
-                module.fail_json(msg=e.message)
+                module.fail_json(msg="Failed to get existing route definitions: " + str(e),
+                                 exception=traceback.format_exc(),
+                                 **camel_dict_to_snake_dict(e.response))
             except RuntimeError as e:
                 module.fail_json(msg=e.args[0])
         else:
@@ -481,7 +484,9 @@ def ensure_route_table_absent(connection, module):
         try:
             route_table = get_route_table_by_id(connection, vpc_id, route_table_id)
         except EC2ResponseError as e:
-            module.fail_json(msg=e.message)
+            module.fail_json(msg="Failed to get existing route definitions: " + str(e),
+                             exception=traceback.format_exc(),
+                             **camel_dict_to_snake_dict(e.response))
 
     if route_table is None:
         return {'changed': False}
@@ -494,7 +499,9 @@ def ensure_route_table_absent(connection, module):
         if e.error_code == 'DryRunOperation':
             pass
         else:
-            module.fail_json(msg=e.message)
+            module.fail_json(msg="Failed to get existing route definitions: " + str(e),
+                             exception=traceback.format_exc(),
+                             **camel_dict_to_snake_dict(e.response))
 
     return {'changed': True}
 
@@ -540,7 +547,8 @@ def ensure_route_table_present(connection, module):
     try:
         routes = create_route_spec(connection, module, vpc_id)
     except AnsibleIgwSearchException as e:
-        module.fail_json(msg=e[0])
+        module.fail_json(msg="Failed to create route table: " + str(e),
+                         exception=traceback.format_exc(), **camel_dict_to_snake_dict(e.response))
 
     changed = False
     tags_valid = False
@@ -550,7 +558,9 @@ def ensure_route_table_present(connection, module):
             try:
                 route_table = get_route_table_by_tags(connection, vpc_id, tags)
             except EC2ResponseError as e:
-                module.fail_json(msg=e.message)
+                module.fail_json(msg="Failed to get existing route table: " + str(e),
+                                 exception=traceback.format_exc(),
+                                 **camel_dict_to_snake_dict(e.response))
             except RuntimeError as e:
                 module.fail_json(msg=e.args[0])
         else:
@@ -559,7 +569,9 @@ def ensure_route_table_present(connection, module):
         try:
             route_table = get_route_table_by_id(connection, vpc_id, route_table_id)
         except EC2ResponseError as e:
-            module.fail_json(msg=e.message)
+            module.fail_json(msg="Failed to get existing route table: " + str(e),
+                             exception=traceback.format_exc(),
+                             **camel_dict_to_snake_dict(e.response))
 
     # If no route table returned then create new route table
     if route_table is None:
@@ -570,8 +582,9 @@ def ensure_route_table_present(connection, module):
             if e.error_code == 'DryRunOperation':
                 module.exit_json(changed=True)
 
-            module.fail_json(msg=e.message)
-
+            # **camel_dict_to_snake_dict(e.response) doesn't work here
+            module.fail_json(msg="Failed to create route table: " + str(e),
+                             exception=traceback.format_exc())
     if routes is not None:
         try:
             result = ensure_routes(connection, route_table, routes,
@@ -579,7 +592,9 @@ def ensure_route_table_present(connection, module):
                                    purge_routes)
             changed = changed or result['changed']
         except EC2ResponseError as e:
-            module.fail_json(msg=e.message)
+            module.fail_json(msg="Failed to setup correct routes: " + str(e),
+                             exception=traceback.format_exc(),
+                             **camel_dict_to_snake_dict(e.response))
 
     if propagating_vgw_ids is not None:
         result = ensure_propagation(connection, route_table,
@@ -598,11 +613,9 @@ def ensure_route_table_present(connection, module):
         try:
             associated_subnets = find_subnets(connection, vpc_id, subnets)
         except EC2ResponseError as e:
-            raise AnsibleRouteTableException(
-                'Unable to find subnets for route table {0}, error: {1}'
-                .format(route_table, e)
-            )
-
+            module.fail_json(
+                msg='Unable to find subnets for route table {0}, error: {1}'.format(route_table, str(e)),
+                exception=traceback.format_exc(), **camel_dict_to_snake_dict(e.response))
         try:
             result = ensure_subnet_associations(connection, vpc_id, route_table,
                                                 associated_subnets,
@@ -610,10 +623,10 @@ def ensure_route_table_present(connection, module):
                                                 purge_subnets)
             changed = changed or result['changed']
         except EC2ResponseError as e:
-            raise AnsibleRouteTableException(
-                'Unable to associate subnets for route table {0}, error: {1}'
-                .format(route_table, e)
-            )
+            # **camel_dict_to_snake_dict(e.response) doesn't work here
+            module.fail_json(
+                msg='Unable to associate subnets for route table {0}, error: {1}'.format(route_table, str(e)),
+                exception=traceback.format_exc())
 
     module.exit_json(changed=changed, route_table=get_route_table_info(route_table))
 
@@ -657,13 +670,10 @@ def main():
     if lookup == 'id' and route_table_id is None:
         module.fail_json(msg="You must specify route_table_id if lookup is set to id")
 
-    try:
-        if state == 'present':
-            result = ensure_route_table_present(connection, module)
-        elif state == 'absent':
-            result = ensure_route_table_absent(connection, module)
-    except AnsibleRouteTableException as e:
-        module.fail_json(msg=str(e))
+    if state == 'present':
+        result = ensure_route_table_present(connection, module)
+    elif state == 'absent':
+        result = ensure_route_table_absent(connection, module)
 
     module.exit_json(**result)
 
