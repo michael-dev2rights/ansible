@@ -66,10 +66,14 @@
        - 'result.failed'
        - 'result.msg.startswith("No handler was ready to authenticate.")'
 
+# FIXME: we should move over to AWS_REGION; EC2_REGION is deprecated
+
 # ============================================================
 - name: test environment variable EC2_REGION
   ec2_key:
     name={{ec2_key_name}}
+    ec2_access_key=bogus_access_key
+    ec2_secret_key=bogus_secret_key
   environment:
     EC2_REGION: '{{ec2_region}}'
   register: result
@@ -132,7 +136,7 @@
 - name: test credential parameters
   ec2_key:
     name={{ec2_key_name}}
-    ec2_region={{ec2_region}}
+    region={{ec2_region}}
     ec2_access_key=bogus_access_key
     ec2_secret_key=bogus_secret_key
   register: result
@@ -148,9 +152,7 @@
 - name: test state=absent with key_material
   ec2_key:
     name='{{ec2_key_name}}'
-    ec2_region={{ec2_region}}
-    ec2_access_key={{ec2_access_key}}
-    ec2_secret_key={{ec2_secret_key}}
+    region={{ec2_region}}
     state=absent
   register: result
 
@@ -163,9 +165,7 @@
 - name: test state=present without key_material
   ec2_key:
     name='{{ec2_key_name}}'
-    ec2_region={{ec2_region}}
-    ec2_access_key={{ec2_access_key}}
-    ec2_secret_key={{ec2_secret_key}}
+    region={{ec2_region}}
     state=present
   register: result
 
@@ -184,11 +184,8 @@
 - name: test state=absent without key_material
   ec2_key:
     name='{{ec2_key_name}}'
+    region={{ec2_region}}
     state=absent
-  environment:
-    EC2_REGION: '{{ec2_region}}'
-    EC2_ACCESS_KEY: '{{ec2_access_key}}'
-    EC2_SECRET_KEY: '{{ec2_secret_key}}'
   register: result
 
 - name: assert state=absent without key_material
@@ -204,11 +201,8 @@
   ec2_key:
     name='{{ec2_key_name}}'
     key_material='{{key_material}}'
+    region={{ec2_region}}
     state=present
-  environment:
-    EC2_REGION: '{{ec2_region}}'
-    EC2_ACCESS_KEY: '{{ec2_access_key}}'
-    EC2_SECRET_KEY: '{{ec2_secret_key}}'
   register: result
 
 - name: assert state=present with key_material
@@ -229,9 +223,7 @@
   ec2_key:
     name='{{ec2_key_name}}'
     key_material='{{key_material}}'
-    ec2_region='{{ec2_region}}'
-    ec2_access_key='{{ec2_access_key}}'
-    ec2_secret_key='{{ec2_secret_key}}'
+    region='{{ec2_region}}'
     state=absent
   register: result
 
@@ -248,12 +240,9 @@
   ec2_key:
     name='{{ec2_key_name}}'
     state=present
+    region={{ec2_region}}
     key_material='{{ item }}'
   with_file: '{{sshkey}}.pub'
-  environment:
-    EC2_REGION: '{{ec2_region}}'
-    EC2_ACCESS_KEY: '{{ec2_access_key}}'
-    EC2_SECRET_KEY: '{{ec2_secret_key}}'
   register: result
 
 - name: assert state=present with key_material with_files (expect changed=true)
@@ -276,12 +265,9 @@
   ec2_key:
     name='{{ec2_key_name}}'
     state=present
+    region={{ec2_region}}
     key_material='{{ item }}'
   with_file: '{{sshkey}}.pub'
-  environment:
-    EC2_REGION: '{{ec2_region}}'
-    EC2_ACCESS_KEY: '{{ec2_access_key}}'
-    EC2_SECRET_KEY: '{{ec2_secret_key}}'
   register: result
 
 - name: assert state=present with key_material with_files (expect changed=false)
@@ -303,10 +289,8 @@
 - name: test state=absent with key_material (expect changed=true)
   ec2_key:
     name='{{ec2_key_name}}'
-    ec2_region='{{ec2_region}}'
-    ec2_access_key='{{ec2_access_key}}'
-    ec2_secret_key='{{ec2_secret_key}}'
     key_material='{{key_material}}'
+    region={{ec2_region}}
     state=absent
   register: result
 
@@ -322,9 +306,7 @@
 - name: test state=absent (expect changed=false)
   ec2_key:
     name='{{ec2_key_name}}'
-    ec2_region='{{ec2_region}}'
-    ec2_access_key='{{ec2_access_key}}'
-    ec2_secret_key='{{ec2_secret_key}}'
+    region='{{ec2_region}}'
     state=absent
   register: result
 
