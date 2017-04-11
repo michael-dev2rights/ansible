@@ -498,8 +498,12 @@ def main():
                             grantGroup = groups[group_id]
 
                         if not module.check_mode:
-                            group.authorize(rule['proto'], rule['from_port'], rule['to_port'], thisip, grantGroup)
-                        changed = True
+                            try:
+                                group.authorize(rule['proto'], rule['from_port'], rule['to_port'], thisip, grantGroup)
+                            except(boto.exception.EC2ResponseError) as err:
+                                module.fail_json(msg="AWS rejected security group rule authorization - " + str(err),
+                                                 exception=traceback.format_exc())
+                            changed = True
 
         # Finally, remove anything left in the groupRules -- these will be defunct rules
         if purge_rules:
