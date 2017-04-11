@@ -286,7 +286,7 @@
       - protocol: http
         load_balancer_port: 80
         instance_port: 80
-
+    profile: ansible-testing-bogus-do-not-create
   register: result
   ignore_errors: true
 
@@ -294,7 +294,8 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("No handler was ready to authenticate.")'
+       - 'result.msg.startswith("Profile")'
+       - '"not found" in result.msg'
 
 
 # ============================================================
@@ -311,8 +312,9 @@
       - protocol: http
         load_balancer_port: 80
         instance_port: 80
+    profile: ansbile-testing-bogus-do-not-create
   environment:
-    EC2_URL: bogus.example.com
+    EC2_URL: bogus.example.com/bogus/path
   register: result
   ignore_errors: true
 
@@ -320,7 +322,8 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("No handler was ready to authenticate.")'
+       - 'result.msg.startswith("Profile")'
+       - '"not found" in result.msg'
 
 
 # ============================================================
@@ -336,6 +339,7 @@
       - protocol: http
         load_balancer_port: 80
         instance_port: 80
+    profile: ansbile-testing-bogus-do-not-create
   environment:
     EC2_URL: '{{ec2_url}}'
   register: result
@@ -345,8 +349,8 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("No handler was ready to authenticate.")'
-
+       - 'result.msg.startswith("Profile")'
+       - '"not found" in result.msg'
 
 # ============================================================
 - name: test credentials from environment
@@ -387,6 +391,8 @@
       - protocol: http
         load_balancer_port: 80
         instance_port: 80
+    ec2_access_key: 'bogus_access_key'
+    ec2_secret_key: 'bogus_secret_key'
   register: result
   ignore_errors: true
 
@@ -394,7 +400,7 @@
   assert:
     that:
        - 'result.failed'
-       - '"No handler was ready to authenticate. 1 handlers were checked." in result.msg'
+       - '"security token included in the request is invalid" in result.msg'
 
 # ============================================================
 - name: remove the test load balancer completely
@@ -402,8 +408,6 @@
     name: "{{ tag_prefix }}"
     region: "{{ ec2_region }}"
     state: absent
-    ec2_access_key: "{{ ec2_access_key }}"
-    ec2_secret_key: "{{ ec2_secret_key }}"
   register: result
 
 - name: assert the load balancer was removed

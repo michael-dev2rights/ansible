@@ -57,6 +57,7 @@
   ec2_key:
     name={{ec2_key_name}}
     region={{ec2_region}}
+    profile=ansible-testing-bogus-do-not-create
   register: result
   ignore_errors: true
 
@@ -64,7 +65,8 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("No handler was ready to authenticate.")'
+       - 'result.msg.startswith("Profile")'
+       - '"not found" in result.msg'
 
 # FIXME: we should move over to AWS_REGION; EC2_REGION is deprecated
 
@@ -72,8 +74,7 @@
 - name: test environment variable EC2_REGION
   ec2_key:
     name={{ec2_key_name}}
-    ec2_access_key=bogus_access_key
-    ec2_secret_key=bogus_secret_key
+    profile=ansible-testing-bogus-do-not-create
   environment:
     EC2_REGION: '{{ec2_region}}'
   register: result
@@ -83,14 +84,16 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("No handler was ready to authenticate.")'
+       - 'result.msg.startswith("Profile")'
+       - '"not found" in result.msg'
 
 # ============================================================
 - name: test invalid ec2_url parameter
   ec2_key:
     name={{ec2_key_name}}
+    profile=ansible-testing-bogus-do-not-create
   environment:
-    EC2_URL: bogus.example.com
+    EC2_URL: http://bogus.example.com/bogus/junk
   register: result
   ignore_errors: true
 
@@ -98,12 +101,14 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("No handler was ready to authenticate.")'
+       - 'result.msg.startswith("Profile")'
+       - '"not found" in result.msg'
 
 # ============================================================
 - name: test valid ec2_url parameter
   ec2_key:
     name={{ec2_key_name}}
+    profile=ansible-testing-bogus-do-not-create
   environment:
     EC2_URL: '{{ec2_url}}'
   register: result
@@ -113,7 +118,8 @@
   assert:
     that:
        - 'result.failed'
-       - 'result.msg.startswith("No handler was ready to authenticate.")'
+       - 'result.msg.startswith("Profile")'
+       - '"not found" in result.msg'
 
 # ============================================================
 - name: test credentials from environment
