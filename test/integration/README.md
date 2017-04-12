@@ -66,7 +66,6 @@ In order to run cloud tests, you must provide access credentials in a file
 named `credentials.yml`.  A sample credentials file named
 `credentials.template` is available for syntax help.
 
-
 Provide cloud credentials:
 
     cp credentials.template credentials.yml
@@ -75,11 +74,23 @@ Provide cloud credentials:
 Run the tests:
     make cloud
 
-*WARNING* running cloud integration tests will create and destroy cloud
-resources.  Running these tests may result in additional fees associated with
-your cloud account.  Care is taken to ensure that created resources are
-removed.  However, it is advisable to inspect your AWS console to ensure no
-unexpected resources are running.
+*WARNING* running cloud integration tests will create and destroy cloud resources.
+Running these tests may result in additional fees associated with your cloud account.
+For the most part care is taken to ensure that created resources are removed.
+However, it is advisable to inspect your AWS console to ensure no unexpected
+resources are running, especially if the tests abort during execution.
+
+********
+Temporary instructions for running the ec2 tests:
+
+* a dedicated security group "ansible-testing-lb-sg" needs to be created.  That
+  security group needs to permit HTTP traffic from your current IP address.
+
+* you need to edit the default security group to allow:
+
+   * HTTP traffic from your current IP address.
+   * SSH traffic from your current IP address
+   * HTTP traffic from the "ansible-testing-lb-sg" security group
 
 Windows Tests
 =============
