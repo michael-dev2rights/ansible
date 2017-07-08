@@ -214,12 +214,14 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.ec2 import ec2_argument_spec, get_aws_connection_info, boto3_conn
 from ansible.module_utils.ec2 import camel_dict_to_snake_dict, HAS_BOTO3
 
+import traceback
 import datetime
 import random
 import time
 
 try:
     import botocore
+    from botocore.exception import ClientError, BotoCoreError
 except ImportError:
     pass  # caught by imported HAS_BOTO3
 
@@ -996,25 +998,31 @@ def main():
         )
     except botocore.exceptions.ClientError as e:
         module.fail_json(msg="Boto3 Client Error - " + str(e.msg))
+    except botocore.exceptions.NoRegionError:
+        module.fail_json(msg="region must be specified")
 
     changed = False
     err_msg = ''
 
     if state == 'present':
-        success, changed, err_msg, results = (
-            pre_create(
-                client, subnet_id, allocation_id, eip_address,
-                if_exist_do_not_create, wait, wait_timeout,
-                client_token, check_mode=check_mode
-            )
-        )
+            try:
+                success, changed, err_msg, results = pre_create(
+                    client, subnet_id, allocation_id, eip_address,
+                    if_exist_do_not_create, wait, wait_timeout,
+                    client_token, check_mode=check_mode
+                )
+            except (ClientError, BotoCoreError) as e:
+                module.fail_json(msg="AWS rejected key operation - " + str(e),
+                                 exception=traceback.format_exc())
     else:
-        success, changed, err_msg, results = (
-            remove(
-                client, nat_gateway_id, wait, wait_timeout, release_eip,
-                check_mode=check_mode
-            )
-        )
+            try:
+                success, changed, err_msg, results = remove(
+                    client, nat_gateway_id, wait, wait_timeout, release_eip,
+                    check_mode=check_mode
+                )
+            except (ClientError, BotoCoreError) as e:
+                module.fail_json(msg="AWS rejected key operation - " + str(e),
+                                 exception=traceback.format_exc())
 
     if not success:
         module.fail_json(
