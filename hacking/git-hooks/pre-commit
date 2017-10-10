@@ -1,10 +1,16 @@
 #!/bin/sh
+
+#  copyright Michael De La Rue (c) 2017
+#  This file is licensed under the AGPLv3
+
+#  pre-commit script which runs a number of tests to limit the chance of checking in bad
+#  code to ansible and thus save time waiting for failed CI runs.
+
 #  pre-commit.sample is part of git, GPL2 licensed so can't be included directly in Ansible.
-#  so we call the version that git puts automatically in the directory.
-
-#  This file is licensed under the GPLv3 as for the rest of Ansible code.
-
+#  use the version that git puts automatically in the directory.
 sh .git/hooks/pre-commit.sample
+
+status=$?
 
 # part inspired from
 # https://stackoverflow.com/questions/20479794/how-do-i-properly-git-stash-pop-in-pre-commit-hooks-to-get-a-clean-working-tree
@@ -18,8 +24,6 @@ if [ "$old_stash" = "$new_stash" ]; then
     exit 0
 fi
 
-status=0
-
 #Note; git diff-index --name-only should correctly quote weird filenames which is
 #very nice!
 if [ "x$allowflakefail" != 'xyes' ]
@@ -29,11 +33,16 @@ then
         case "$file" in
             lib/ansible/modules/*.py)
                 ./test/sanity/validate-modules/validate-modules "$file"
+                newstat=$?
+                if [ $newstat > $status ]
+                then
+                    status=$newstat
+                fi
                 # this flake8 is more agressive than the tests included in validate-modules
                 # so run it second to allow skipping only after the other tests pass
-                flake8 --ignore=W503,E402,E501 "$file" ;;
+                flake8 --ignore=W503,E402,E501 "$file" && ! grep 'pdb.set_trace\|FIXME' $file ;;
             *.py)
-                flake8 --ignore=W503,E402,E501 "$file" ;;
+                flake8 --ignore=W503,E402,E501 "$file" && ! grep 'pdb.set_trace\|FIXME' $file ;;
             *.yaml | *.yml )
                 yamllint "$file" ;;
         esac
@@ -44,7 +53,7 @@ then
         fi
     done
 fi
-
+             
 # Restore changes
 git reset --hard -q && git stash apply --index -q && git stash drop -q
 

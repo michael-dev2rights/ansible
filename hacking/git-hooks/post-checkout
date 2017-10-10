@@ -1,1 +1,10 @@
+#!/bin/sh
+
+# copyright Michael De La Rue (c) 2017
+# This file is licensed under the AGPLv3
+
+# post checkout git hook - removes compiled python files which won't get updated if we
+# have checked out an older versio of code than the one that was there at the time they
+# were compiled.
+
 find . -name '*.pyc' -print0 | xargs -0r rm
