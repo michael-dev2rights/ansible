@@ -6,7 +6,9 @@
     # if the software is already installed (e.g. running locally as non-root)
 
     - name: install dnsutils with apt so we get dig
-      apt: name=dnsutils state=present
+      apt:
+        name: dnsutils
+        state: present
       ignore_errors: yes
 
     # get network data ; do this early so that we fail fast if the
@@ -50,6 +52,16 @@
         security_token: '{{ security_token }}'
       register: setup_key
 
+
+    - name: create a temporary file for storing the key in
+      tempfile:
+      register: key_file
+
+    - name: load ssh private key into temp file
+      copy:
+       content: "{{ setup_key.key.private_key }}"
+       dest: "{{ key_file.path }}"
+
     - name: create a subnet to use for creating an ec2 instance
       ec2_vpc_subnet:
         az: '{{ ec2_region }}a'
@@ -65,8 +77,23 @@
         security_token: '{{ security_token }}'
       register: setup_subnet
 
-
     - name: create routing rules
+      ec2_vpc_route_table:
+        vpc_id: "{{ setup_vpc.vpc.id }}"
+        region: "{{ ec2_region }}"
+        tags:
+          created: "{{ resource_prefix }}-route"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ igw.gateway_id }}"
+        subnets:
+          - "{{ setup_subnet.subnet.id }}"
+        ec2_region: '{{ ec2_region }}'
+        ec2_access_key: '{{ ec2_access_key }}'
+        ec2_secret_key: '{{ ec2_secret_key }}'
+        security_token: '{{ security_token }}'
+
+    - name: create routing rules again
       ec2_vpc_route_table:
         vpc_id: "{{ setup_vpc.vpc.id }}"
         region: "{{ ec2_region }}"
@@ -131,36 +158,51 @@
 
     - name: record instance
       set_fact:
-        setup_ec2_instance_ip: setup_instance.instances.public_dns_name
+        setup_ec2_instance_ip: "{{ setup_instance.instances[0].public_dns_name }}"
 
     - name: check that ssh is up and contactable on build host before proceeding
       wait_for:
-        delay=2
-        host={{ setup_ec2_instance_ip }}
-        port=22
-        search_regex=OpenSSH
-        state=started
-        timeout=600
+        delay: 2
+        host: "{{ setup_ec2_instance_ip }}"
+        port: 22
+        search_regex: OpenSSH
+        state: started
+        timeout: 1000
+
+    - name: make ssh private key available
+      command: "ssh-add {{ key_file.path }}"
+
+    # - name: fixup vars
+    #   set_fact:
+    #     setup_ec2_instance_ip: ec2-54-152-198-102.compute-1.amazonaws.com
+    #     key_file:
+    #         path: /tmp/ansible.kwK3ql
+
+    # add a host alias that we reach through a tunnel (Ansible <= 1.9)
+    - add_host:
+        hostname: "{{ setup_ec2_instance_ip }}"
+        ansible_ssh_host: "{{ setup_ec2_instance_ip }}"
+        ansible_user: ec2-user
 
     - name: copy remote build data into place
       tag: create
       copy:
          src: db_lambda
-         dest: "{{output_dir}}"
-      delegate_to: setup_ec2_instance_ip
+         dest: "/tmp"
+      delegate_to: "{{ setup_ec2_instance_ip }}"
 
     - name: build the database lambda zip including dependency discovery
       tag: create
       make:
-        chdir: "{{output_dir}}/db_lambda"
-      delegate_to: setup_ec2_instance_ip
+        chdir: "/home/ec2_user/db_lambda"
+      delegate_to: "{{ setup_ec2_instance_ip }}"
 
     - name: copy remote build data into place
       tag: create
-      copy:
-         src: db_lambda
-         dest: "{{output_dir}}"
-      delegate_to: setup_ec2_instance_ip
+      fetch:
+         src: "/home/ec2_user/db_lambda/db_lambda.zip"
+         dest: "{{output_dir}}/db_lambda.zip"
+      delegate_to: "{{ setup_ec2_instance_ip }}"
 
   always:
     - name: remove setup ec2 instance
