@@ -1,0 +1,230 @@
+# create an appropriate EC2 instance for running compilation
+
+- block:
+
+    # install pre-requisite software ; ignoreerrors allows us to proceed anyway
+    # if the software is already installed (e.g. running locally as non-root)
+
+    - name: install dnsutils with apt so we get dig
+      apt: name=dnsutils state=present
+      ignore_errors: yes
+
+    # get network data ; do this early so that we fail fast if the
+    # command is missing.
+
+    - name: discover public IP address of ansible host
+      shell: dig +short myip.opendns.com @resolver1.opendns.com
+      register: ip_dig_result
+
+    # SETUP: vpc, ec2 key pair, subnet, security group, ec2 instance, snapshot
+
+    - name: create a VPC to work in
+      ec2_vpc_net:
+        cidr_block: 10.0.0.0/24
+        state: present
+        name: '{{ ec2_build_name }}_setup'
+        resource_tags:
+          Name: '{{ ec2_build_name }}_setup'
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+      register: setup_vpc
+
+    - name: Create internet gateway for use in testing
+      ec2_vpc_igw:
+        state: present
+        vpc_id: "{{setup_vpc.vpc.id}}"
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+      register: igw
+
+    - name: create a key pair to use for creating an ec2 instance
+      ec2_key:
+        name: '{{ ec2_build_name }}_setup'
+        state: present
+        ec2_region: '{{ ec2_region }}'
+        ec2_access_key: '{{ ec2_access_key }}'
+        ec2_secret_key: '{{ ec2_secret_key }}'
+        security_token: '{{ security_token }}'
+      register: setup_key
+
+    - name: create a subnet to use for creating an ec2 instance
+      ec2_vpc_subnet:
+        az: '{{ ec2_region }}a'
+        tags: '{{ ec2_build_name }}_setup'
+        vpc_id: '{{ setup_vpc.vpc.id }}'
+        cidr: 10.0.0.0/24
+        state: present
+        resource_tags:
+          Name: '{{ ec2_build_name }}_setup'
+        ec2_region: '{{ ec2_region }}'
+        ec2_access_key: '{{ ec2_access_key }}'
+        ec2_secret_key: '{{ ec2_secret_key }}'
+        security_token: '{{ security_token }}'
+      register: setup_subnet
+
+
+    - name: create routing rules
+      ec2_vpc_route_table:
+        vpc_id: "{{ setup_vpc.vpc.id }}"
+        region: "{{ ec2_region }}"
+        tags:
+          created: "{{ resource_prefix }}-route"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ igw.gateway_id }}"
+        subnets:
+          - "{{ setup_subnet.subnet.id }}"
+        ec2_region: '{{ ec2_region }}'
+        ec2_access_key: '{{ ec2_access_key }}'
+        ec2_secret_key: '{{ ec2_secret_key }}'
+        security_token: '{{ security_token }}'
+
+    - name: create a security group for use in various tests
+      ec2_group:
+        state: present
+        name: '{{ ec2_build_name }}_setup'
+        description: 'created by Ansible integration tests'
+        vpc_id: '{{ setup_vpc.vpc.id }}'
+        region: "{{ ec2_region }}"
+        rules:
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: "{{ip_dig_result.stdout}}/32"
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+      register: setup_sg
+
+    - name: provision ec2 instance for creating lambda
+      ec2:
+        key_name: '{{ setup_key.key.name }}'
+        instance_type: t2.micro
+        assign_public_ip: yes
+        instance_initiated_shutdown_behavior: terminate
+        state: present
+        image: '{{ lambda_ami_image[ec2_region] }}'
+        wait: yes
+        instance_tags:
+          '{{ec2_build_name}}_instance_setup': 'integration_tests'
+          'ansibleuse': 'ANSIBLE_TEST_BUILDHOST'
+        group_id: '{{ setup_sg.group_id }}'
+        user_data:
+           - "sudo shutdown -h +55 &"
+           - "sudo yum -y install python36-devel"
+           - "sudo touch /var/run/user-data-script-finished"
+        vpc_subnet_id: '{{ setup_subnet.subnet.id }}'
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+      register: setup_instance
+
+    # - name: Refresh EC2 cache
+    #   command: "{{inventory_dir}}/ec2.py --refresh-cache"
+    # - name: Refresh in-memory EC2 cache
+    #   meta: refresh_inventory
+
+    - name: record instance
+      set_fact:
+        setup_ec2_instance_ip: setup_instance.instances.public_dns_name
+
+    - name: check that ssh is up and contactable on build host before proceeding
+      wait_for:
+        delay=2
+        host={{ setup_ec2_instance_ip }}
+        port=22
+        search_regex=OpenSSH
+        state=started
+        timeout=600
+
+    - name: copy remote build data into place
+      tag: create
+      copy:
+         src: db_lambda
+         dest: "{{output_dir}}"
+      delegate_to: setup_ec2_instance_ip
+
+    - name: build the database lambda zip including dependency discovery
+      tag: create
+      make:
+        chdir: "{{output_dir}}/db_lambda"
+      delegate_to: setup_ec2_instance_ip
+
+    - name: copy remote build data into place
+      tag: create
+      copy:
+         src: db_lambda
+         dest: "{{output_dir}}"
+      delegate_to: setup_ec2_instance_ip
+
+  always:
+    - name: remove setup ec2 instance
+      ec2:
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+        instance_type: t2.micro
+        instance_ids: '{{ setup_instance.instance_ids }}'
+        state: absent
+        wait: yes
+        instance_tags:
+          '{{ec2_build_name}}_instance_setup': 'integration_tests'
+        group_id: '{{ setup_sg.group_id }}'
+        vpc_subnet_id: '{{ setup_subnet.subnet.id }}'
+      ignore_errors: yes
+
+    - name: remove setup keypair
+      ec2_key:
+        name: '{{ec2_build_name}}_setup'
+        state: absent
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+      ignore_errors: yes
+
+    - name: remove setup security group
+      ec2_group:
+        name: '{{ ec2_build_name }}_setup'
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+        description: 'created by Ansible integration tests'
+        state: absent
+        vpc_id: '{{ setup_vpc.vpc.id }}'
+      ignore_errors: yes
+
+    - name: remove setup subnet
+      ec2_vpc_subnet:
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+        az: '{{ ec2_region }}a'
+        tags: '{{ec2_build_name}}_setup'
+        vpc_id: '{{ setup_vpc.vpc.id }}'
+        cidr: 10.0.0.0/24
+        state: absent
+        resource_tags:
+          Name: '{{ ec2_build_name }}_setup'
+      ignore_errors: yes
+
+    - name: remove setup VPC
+      ec2_vpc_net:
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+        cidr_block: 10.0.0.0/24
+        state: absent
+        name: '{{ ec2_build_name }}_setup'
+        resource_tags:
+          Name: '{{ ec2_build_name }}_setup'
+      ignore_errors: yes

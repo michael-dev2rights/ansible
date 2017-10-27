@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+set -eux
+
+ansible-playbook -vvv -i ../../../../contrib/inventory/ec2.py  create-deploy.yml

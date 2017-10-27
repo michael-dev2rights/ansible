@@ -392,7 +392,6 @@
       rds_instance:
         id: "{{ rds_instance_name }}"
         state: absent
-        snapshot: "{{ rds_instance_name }}-snapshot"
         wait: yes
         region: '{{ec2_region}}'
         aws_access_key: '{{aws_access_key}}'

@@ -207,11 +207,13 @@ configuration:
 from ansible.module_utils._text import to_native
 from ansible.module_utils.aws.core import AnsibleAWSModule
 from ansible.module_utils.ec2 import get_aws_connection_info, boto3_conn, camel_dict_to_snake_dict
+from distutils.version import StrictVersion
 import base64
 import hashlib
 import traceback
 
 try:
+    from botocore import __version__ as botocore__version__
     from botocore.exceptions import ClientError, ValidationError, ParamValidationError
 except ImportError:
     pass  # protected by AnsibleAWSModule
@@ -278,7 +280,7 @@ def main():
         runtime=dict(),
         role=dict(),
         handler=dict(),
-        zip_file=dict(aliases=['src']),
+        zip_file=dict(type='path', aliases=['src']),
         s3_bucket=dict(),
         s3_key=dict(),
         s3_object_version=dict(),
@@ -305,6 +307,16 @@ def main():
                               mutually_exclusive=mutually_exclusive,
                               required_together=required_together,
                               required_if=required_if)
+
+    # 1.7.30 is just the current version as I write this today.  Update
+    # this any time that you find some API functionality missing from
+    # previous versions of botocore.
+
+    if StrictVersion(botocore__version__) < StrictVersion('1.7.30'):
+        warn_msg = "your version of botocore {0} is old; you may find some functionality missing"
+        module.warn(warn_msg.format(botocore__version__))
+
+    # 1.4.70 is known not to support environment variables in lambda function uploads
 
     name = module.params.get('name')
     state = module.params.get('state').lower()

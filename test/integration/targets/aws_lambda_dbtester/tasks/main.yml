@@ -1,0 +1,119 @@
+---
+#
+#  Author: Michael De La Rue
+#  based on ec2_key.yml + lambda.py
+
+- block:
+
+    # ============================================================
+
+    # - name: copy lambda into place
+    #   tag: create
+    #   copy:
+    #     src: db_lambda
+    #     dest: "{{output_dir}}"
+
+    # - name: build the database lambda zip including dependency discovery
+    #   tag: create
+    #   make:
+    #     chdir: "{{output_dir}}/db_lambda"
+
+    # - name: debug
+    #   debug:
+    #     msg: "System {{ inventory_hostname }} has output_dir {{output_dir}}"
+
+    # - name: debugdir
+    #   command: "ls -lR {{output_dir}}"
+
+    - name: fix up variables
+      set_fact:
+         lambda_function_name: ansible-test-carla-19580149
+
+    - name: copy lambda deployment filieinto place
+      tag: create
+      copy:
+        src: db_lambda.zip
+        dest: "{{output_dir}}"
+
+    # - name: test state=present - upload the lambda
+    #   tag: create
+    #   local_action:
+    #     module: lambda
+    #     name: "{{lambda_function_name}}"
+    #     runtime: "python2.7"
+    #     handler: "db_lambda.handler"
+    #     role: "ansible_lambda_role"
+    #     ec2_region: '{{ec2_region}}'
+    #     ec2_access_key: '{{ec2_access_key}}'
+    #     ec2_secret_key: '{{ec2_secret_key}}'
+    #     security_token: '{{security_token}}'
+    #     zip_file: "{{output_dir}}/db_lambda.zip"
+    #   register: result
+
+    - name: test state=present - update the lambda to have some environment variaibles
+      tag: create
+      local_action:
+        module: lambda
+        name: "{{lambda_function_name}}"
+        runtime: "python2.7"
+        handler: "db_lambda.handler"
+        role: "ansible_lambda_role"
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+        zip_file: "{{output_dir}}/db_lambda.zip"
+        environment_variables:
+          DB_HOST=ansible-test-carla-39766284-rds.coi1wqsjwe32.us-east-1.rds.amazonaws.com
+          DB_PORT=5432
+          DB_NAME=actual_db
+          DB_USER=hello
+          DB_PASSWORD='world123$$'
+      register: result
+
+    - name: assert lambda upload succeeded
+      tag: create
+      assert:
+        that:
+           - 'not result|failed'
+
+    - name: test lambda works
+      tag: create
+      local_action:
+        module: execute_lambda
+        name: "{{lambda_function_name}}"
+        payload:
+          command: ping
+        ec2_region: '{{ec2_region}}'
+        ec2_access_key: '{{ec2_access_key}}'
+        ec2_secret_key: '{{ec2_secret_key}}'
+        security_token: '{{security_token}}'
+      register: result
+
+    - name: assert lambda manages to respond as expected
+      tag: create
+      assert:
+        that:
+           - 'not result|failed'
+           - 'result.result.output.return == "pong"'
+
+  # always:
+
+  #   # ============================================================
+  #   - name: test state=absent (expect changed=False)
+  #     tag: delete
+  #     lambda:
+  #       name="{{lambda_function_name}}"
+  #       ec2_region='{{ec2_region}}'
+  #       ec2_access_key='{{ec2_access_key}}'
+  #       ec2_secret_key='{{ec2_secret_key}}'
+  #       security_token='{{security_token}}'
+  #       state=absent
+  #     register: result
+
+  #   - name: assert state=absent
+  #     tag: delete
+  #     assert:
+  #       that:
+  #          - 'not result|failed'
+  #          - 'result.changed == False'

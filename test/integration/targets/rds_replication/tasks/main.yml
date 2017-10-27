@@ -1,0 +1,150 @@
+# RDS replication test case.
+
+# This test case verifies the operational case of replicating an RDS database
+# and then failing over to the replica ensuring that all of the data in the
+# replica is up to date
+
+- block:
+
+    # Given that I didn't have an already existing database
+    #
+    # (important in case we restart the tests after a fail.)
+    - name: ensure instance we are going to create is not present so create test is valid
+      rds_instance:
+        id: "{{ rds_instance_name }}"
+        wait: yes
+        state: absent
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'
+
+    # Given that I created an RDS
+    - name: create rds instance
+      rds_instance:
+        id: "{{ rds_instance_name }}"
+        wait_timeout: 1200
+        wait: yes
+        size: 50
+        db_name: actual_db
+        db_instance_class: db.t2.micro
+        engine: postgres
+        master_username: hello
+        master_user_password: "world123$$"
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'
+      register: rds_instance
+
+    - name: fix up temporary variables
+      set_fact:
+        lambda_function_name: ansible-test-carla-92861581
+        rds_instance_name: ansible-test-carla-39766284-rds
+        region: "us-east-1"
+
+    # - name: fix up variables
+    #   include_vars:
+    #     file: cloud-config-aws.yml
+
+    # And that I inserted some initial data
+    - name: install data lambda
+      include_role:
+        name: aws_lambda_dbtester
+        tasks_from: setup_and_test
+
+    - name: execute data lambda
+      execute_lambda:
+        name: "{{lambda_function_name}}"
+        payload:
+          database: rds_instance.endpoint
+          engine: postgres
+          command: initial_data
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'
+      register: response
+
+    # And that I create a replica
+    - name: create rds replica
+      rds_instance:
+        id: "{{ rds_instance_name }}-replica"
+        source_db_instance_identifier: "{{ rds_instance_name }}"
+        size: 50
+        db_instance_class: db.t2.micro
+        engine: postgres
+        master_username: hello
+        wait: yes
+        wait_timeout: 2000
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'
+      register: rds_replica
+
+    #Then the initial data should be in the lambda.
+    - name: get status of initial data
+      execute_lambda:
+        name: "{{lambda_function_name}}"
+        payload:
+          database: rds_replica.endpoint
+          engine: postgres
+          command: verify_initial_data
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'
+      register: response
+
+    - name: check status is correct
+      assert:
+        that:
+          - response.result.output.return == 'true'
+
+    #add some data and check it's not in replica instantly
+    - name: get instance facts
+      rds_instance_facts:
+        id: "{{ rds_instance_name }}"
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'
+      register: rds_instance_facts
+
+    #check replica state shows replica is not in sync
+
+    #wait for replica state to catch up
+
+    #check data is now up to date
+
+    #add some more data
+
+  always:
+
+    # And that I inserted some initial data
+    - name: install data lambda
+      include_role:
+        name: aws_lambda_dbtester
+        tasks_from: cleanup
+
+    - name: delete rds instance
+      rds_instance:
+        id: "{{ rds_instance_name }}"
+        state: absent
+        wait: yes
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'
+      ignore_errors: true
+
+    - name: delete restored instance
+      rds_instance:
+        id: "{{ rds_instance_name }}-replica"
+        state: absent
+        wait: yes
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'

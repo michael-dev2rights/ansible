@@ -105,6 +105,9 @@ class AnsibleAWSModule(object):
     def params(self):
         return self._module.params
 
+    def warn(self, *args, **kwargs):
+        return self._module.warn(*args, **kwargs)
+
     def exit_json(self, *args, **kwargs):
         return self._module.exit_json(*args, **kwargs)
 
