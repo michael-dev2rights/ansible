@@ -78,23 +78,23 @@
            - 'not result|failed'
            - 'result.result.output.return == "pong"'
 
-  always:
+  # always:
 
-    # ============================================================
-    - name: test state is absent (expect changed is False)
-      tag: delete
-      lambda:
-        name: "{{lambda_function_name}}"
-        ec2_region: '{{ec2_region}}'
-        ec2_access_key: '{{ec2_access_key}}'
-        ec2_secret_key: '{{ec2_secret_key}}'
-        security_token: '{{security_token}}'
-        state: absent
-      register: result
+  #   # ============================================================
+  #   - name: test state is absent (expect changed is False)
+  #     tag: delete
+  #     lambda:
+  #       name: "{{lambda_function_name}}"
+  #       ec2_region: '{{ec2_region}}'
+  #       ec2_access_key: '{{ec2_access_key}}'
+  #       ec2_secret_key: '{{ec2_secret_key}}'
+  #       security_token: '{{security_token}}'
+  #       state: absent
+  #     register: result
 
-    - name: assert state is absent
-      tag: delete
-      assert:
-        that:
-           - 'not result|failed'
-           - 'result.changed == False'
+  #   - name: assert state is absent
+  #     tag: delete
+  #     assert:
+  #       that:
+  #          - 'not result|failed'
+  #          - 'result.changed == False'

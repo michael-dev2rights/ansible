@@ -5,7 +5,6 @@
 # replica is up to date
 
 - block:
-
     #    Given that I created an RDS
     - name: create rds instance
       rds_instance:
@@ -24,20 +23,20 @@
         security_token: '{{security_token}}'
       register: rds_instance
 
-    - name: fix up temporary variables
-      set_fact:
-        rds_instance_name: "{{ rds_instance.instances[0].instance_id }}"
-        endpoint: "{{ rds_instance.endpoint }}"
 
-    - name: fix up variables
-      include_vars:
-        file: cloud-config-aws.yml
+    # - name: fix up temporary variables
+    #   set_fact:
+    #     rds_instance_name: "{{ rds_instance.instances[0].instance_id }}"
+    #     endpoint: "{{ rds_instance.endpoint }}"
 
-    # And that I inserted some initial data
-    - name: install data lambda
-      include_role:
-        name: aws_lambda_dbtester
-        tasks_from: setup_and_test
+
+    # include this via depends for now
+
+    # # And that I inserted some initial data
+    # - name: install data lambda
+    #   include_role:
+    #     name: aws_lambda_dbtester
+    #     tasks_from: setup_and_test
 
     - name: execute data lambda
       execute_lambda:
@@ -120,21 +119,21 @@
 
     #add some more data
 
-  always:
+  # always:
 
-    # And that I inserted some initial data
-    - name: install data lambda
-      include_role:
-        name: aws_lambda_dbtester
-        tasks_from: cleanup
+  #   # And that I inserted some initial data
+  #   - name: install data lambda
+  #     include_role:
+  #       name: aws_lambda_dbtester
+  #       tasks_from: cleanup
 
-    - name: delete rds instance
-      rds_instance:
-        id: "{{ rds_instance_name }}"
-        state: absent
-        wait: yes
-        region: '{{ec2_region}}'
-        aws_access_key: '{{aws_access_key}}'
-        aws_secret_key: '{{aws_secret_key}}'
-        security_token: '{{security_token}}'
-      ignore_errors: true
+  #   - name: delete rds instance
+  #     rds_instance:
+  #       id: "{{ rds_instance_name }}"
+  #       state: absent
+  #       wait: yes
+  #       region: '{{ec2_region}}'
+  #       aws_access_key: '{{aws_access_key}}'
+  #       aws_secret_key: '{{aws_secret_key}}'
+  #       security_token: '{{security_token}}'
+  #     ignore_errors: true
