@@ -165,7 +165,8 @@ def injector():
             interpreter = config.remote_interpreter
 
         if interpreter:
-            args += ['--extra-vars', 'ansible_python_interpreter=' + interpreter]
+            pass
+#            args += ['--extra-vars', 'ansible_python_interpreter=' + interpreter]
 
     args += config.arguments[1:]
 

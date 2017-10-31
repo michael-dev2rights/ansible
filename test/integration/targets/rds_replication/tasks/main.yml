@@ -6,20 +6,7 @@
 
 - block:
 
-    # Given that I didn't have an already existing database
-    #
-    # (important in case we restart the tests after a fail.)
-    - name: ensure instance we are going to create is not present so create test is valid
-      rds_instance:
-        id: "{{ rds_instance_name }}"
-        wait: yes
-        state: absent
-        region: '{{ec2_region}}'
-        aws_access_key: '{{aws_access_key}}'
-        aws_secret_key: '{{aws_secret_key}}'
-        security_token: '{{security_token}}'
-
-    # Given that I created an RDS
+    #    Given that I created an RDS
     - name: create rds instance
       rds_instance:
         id: "{{ rds_instance_name }}"
@@ -30,7 +17,7 @@
         db_instance_class: db.t2.micro
         engine: postgres
         master_username: hello
-        master_user_password: "world123$$"
+        master_user_password: "bworld123$$"
         region: '{{ec2_region}}'
         aws_access_key: '{{aws_access_key}}'
         aws_secret_key: '{{aws_secret_key}}'
@@ -39,13 +26,12 @@
 
     - name: fix up temporary variables
       set_fact:
-        lambda_function_name: ansible-test-carla-92861581
-        rds_instance_name: ansible-test-carla-39766284-rds
-        region: "us-east-1"
+        rds_instance_name: "{{ rds_instance.instances[0].instance_id }}"
+        endpoint: "{{ rds_instance.endpoint }}"
 
-    # - name: fix up variables
-    #   include_vars:
-    #     file: cloud-config-aws.yml
+    - name: fix up variables
+      include_vars:
+        file: cloud-config-aws.yml
 
     # And that I inserted some initial data
     - name: install data lambda
@@ -57,9 +43,23 @@
       execute_lambda:
         name: "{{lambda_function_name}}"
         payload:
-          database: rds_instance.endpoint
+          database: "{{ endpoint }}"
           engine: postgres
           command: initial_data
+        region: '{{ec2_region}}'
+        aws_access_key: '{{aws_access_key}}'
+        aws_secret_key: '{{aws_secret_key}}'
+        security_token: '{{security_token}}'
+      register: response
+
+    #Then the initial data should be in the RDS.
+    - name: get status of initial data
+      execute_lambda:
+        name: "{{lambda_function_name}}"
+        payload:
+          database: "{{ endpoint }}"
+          engine: postgres
+          command: verify_initial_data
         region: '{{ec2_region}}'
         aws_access_key: '{{aws_access_key}}'
         aws_secret_key: '{{aws_secret_key}}'
@@ -83,12 +83,12 @@
         security_token: '{{security_token}}'
       register: rds_replica
 
-    #Then the initial data should be in the lambda.
+    #Then the initial data should be in the replica.
     - name: get status of initial data
       execute_lambda:
         name: "{{lambda_function_name}}"
         payload:
-          database: rds_replica.endpoint
+          database: "{{ rds_replica.instance.endpoint.address }}"
           engine: postgres
           command: verify_initial_data
         region: '{{ec2_region}}'
@@ -138,13 +138,3 @@
         aws_secret_key: '{{aws_secret_key}}'
         security_token: '{{security_token}}'
       ignore_errors: true
-
-    - name: delete restored instance
-      rds_instance:
-        id: "{{ rds_instance_name }}-replica"
-        state: absent
-        wait: yes
-        region: '{{ec2_region}}'
-        aws_access_key: '{{aws_access_key}}'
-        aws_secret_key: '{{aws_secret_key}}'
-        security_token: '{{security_token}}'

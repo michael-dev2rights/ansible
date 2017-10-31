@@ -52,7 +52,6 @@
         security_token: '{{ security_token }}'
       register: setup_key
 
-
     - name: create a temporary file for storing the key in
       tempfile:
       register: key_file
@@ -151,6 +150,9 @@
         security_token: '{{security_token}}'
       register: setup_instance
 
+    # in an integration test this is not useful since we always run against localhost
+    # and have to use delegate to; other situations it might work.
+    #
     # - name: Refresh EC2 cache
     #   command: "{{inventory_dir}}/ec2.py --refresh-cache"
     # - name: Refresh in-memory EC2 cache
@@ -172,35 +174,48 @@
     - name: make ssh private key available
       command: "ssh-add {{ key_file.path }}"
 
-    # - name: fixup vars
-    #   set_fact:
-    #     setup_ec2_instance_ip: ec2-54-152-198-102.compute-1.amazonaws.com
-    #     key_file:
-    #         path: /tmp/ansible.kwK3ql
+    - name: fixup vars
+      set_fact:
 
     # add a host alias that we reach through a tunnel (Ansible <= 1.9)
     - add_host:
         hostname: "{{ setup_ec2_instance_ip }}"
         ansible_ssh_host: "{{ setup_ec2_instance_ip }}"
         ansible_user: ec2-user
+        ansible_python_interpreter: /usr/bin/python
 
     - name: copy remote build data into place
+      ansible_python_interpreter: /usr/bin/python
       tag: create
       copy:
-         src: db_lambda
+         src: 'db_lambda'
          dest: "/tmp"
       delegate_to: "{{ setup_ec2_instance_ip }}"
+      ignore_errors: yes
+
+    - name: set up packages for AWS python3 lambda environment
+      tag: create
+      yum:
+        name: "{{ item }}"
+        state: latest
+      with_items:
+        - python36
+        - python36-pip
+        - python36-virtualenv
+      delegate_to: "{{ setup_ec2_instance_ip }}"
+      become: true
 
     - name: build the database lambda zip including dependency discovery
       tag: create
       make:
-        chdir: "/home/ec2_user/db_lambda"
+        chdir: "/tmp/db_lambda"
       delegate_to: "{{ setup_ec2_instance_ip }}"
 
-    - name: copy remote build data into place
+    - name: copy back build output - lambda zipfile
       tag: create
       fetch:
-         src: "/home/ec2_user/db_lambda/db_lambda.zip"
+         flat: yes
+         src: "/tmp/db_lambda/db_lambda.zip"
          dest: "{{output_dir}}/db_lambda.zip"
       delegate_to: "{{ setup_ec2_instance_ip }}"
 
@@ -258,6 +273,8 @@
           Name: '{{ ec2_build_name }}_setup'
       ignore_errors: yes
 
+    # this may take a VERY long time since we are waiting for complete destruction of an
+    # instance
     - name: remove setup VPC
       ec2_vpc_net:
         ec2_region: '{{ec2_region}}'
@@ -269,4 +286,8 @@
         name: '{{ ec2_build_name }}_setup'
         resource_tags:
           Name: '{{ ec2_build_name }}_setup'
+      register: result
+      until: "'changed' in result and result.changed == true"
+      retries: 20
+      delay: 20
       ignore_errors: yes

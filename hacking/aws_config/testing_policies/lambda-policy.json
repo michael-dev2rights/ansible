@@ -70,7 +70,8 @@
                 "iam:PassRole"
             ],
             "Resource": [
-                "arn:aws:iam::{{aws_account}}:role/ansible_lambda_role"
+                "arn:aws:iam::{{aws_account}}:role/ansible_lambda_role",
+                "arn:aws:iam::{{aws_account}}:role/ansible_lambda_vpc"
             ]
         }
     ]

@@ -14,15 +14,29 @@ import os
 # public use.
 #
 
-password = os.environ["DB_PASSWORD"]
-host = os.environ["DB_HOST"]
-user = os.environ["DB_USER"]
-port = os.environ["DB_PORT"]
-name = os.environ["DB_NAME"]
+default_host = os.environ.get("DB_HOST")
+
+try:
+    password = os.environ["DB_PASSWORD"]
+except:
+    password = "friend"
+
+try:
+    user = os.environ["DB_USER"]
+except KeyError:
+    user = 'postgres'
+
+try:
+    port = os.environ["DB_PORT"]
+except KeyError:
+    port = 5432
+
+try:
+    name = os.environ["DB_NAME"]
+except KeyError:
+    name = 'postgres'
+
 url_template = 'postgresql://{}:{}@{}:{}/{}'
-url = url_template.format(user, password, host, port, name)
-db_con = create_engine(url, client_encoding='utf8')
-db_meta = MetaData(bind=db_con, reflect=True)
 
 rows = 172
 
@@ -40,7 +54,20 @@ def handler(event, context):
     # which will result in an amazon chosen failure from the lambda
     # which can be completely fine.
 
+    try:
+        host = event["database"]
+    except KeyError:
+        host = default_host
+
     command = event["command"]
+
+    url = url_template.format(user, password, host, port, name)
+    print("creating connection to {} \n".format(url))
+    db_con = create_engine(url, client_encoding='utf8', connect_args={'connect_timeout': 10})
+
+    print("getting metadata\n")
+
+    db_meta = MetaData(bind=db_con, reflect=True)
 
     commands = {
         "ping": ping,
@@ -51,20 +78,25 @@ def handler(event, context):
     # we can use environment variables as part of the configuration of the lambda
     # which can change the behaviour of the lambda without needing a new upload
 
-    return commands[command](event)
+    return commands[command](db_con, db_meta, event)
 
 
-def ping(event):
+def ping(db_con, db_meta, event):
+    print("running ping\n")
     return {"return": "pong"}
 
 
-def verify_initial_data(event):
+def verify_initial_data(db_con, db_meta, event):
+    print("running verify\n")
     try:
         table = db_meta.tables['fake_data_table']
     except KeyError:
         return {"return": "failed - no table"}
+    print("going for select\n")
     s = select([func.count("*")], from_obj=[table])
     count = s.execute().scalar()
+    print("found count {0} of rows\n".format(count))
+
     if count == rows:
         return {"return": "true"}
     else:
@@ -80,19 +112,24 @@ class FakePersonObject(Base):
     name = Column(String)
 
 
-def initial_data(event):
+def initial_data(db_con, db_meta, event):
+    print("outputting initial data\n")
     try:
         table = db_meta.tables['fake_data_table']
         table.drop(db_con)
     except KeyError:
         pass
+    print("creating meta data\n")
     Base.metadata.create_all(db_con)
     session = sessionmaker(bind=db_con)
     s = session()
+    print("creating fake people to database\n")
     for i in range(0, 172):
         john = FakePersonObject(name='john')
         s.add(john)
+    print("committing to database\n")
     s.commit()
+    print("return from initial data\n")
     return {"return": "maybe I created it; maybe not"}
 
 
@@ -101,6 +138,7 @@ def main():
     This main function will normally never be called during normal
     lambda use.  It is here for testing the lambda program only.
     """
+    print("running main function for testing\n")
     try:
         event_json = argv[1]
         event = json.loads(event_json)

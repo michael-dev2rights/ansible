@@ -4,7 +4,6 @@ from __future__ import absolute_import, print_function
 
 import json
 import os
-import collections
 import datetime
 import re
 import tempfile
@@ -59,7 +58,6 @@ from lib.ansible_util import (
 )
 
 from lib.target import (
-    IntegrationTarget,
     walk_external_targets,
     walk_internal_targets,
     walk_posix_integration_targets,
@@ -84,13 +82,8 @@ from lib.classification import (
 
 from lib.config import (
     TestConfig,
-    EnvironmentConfig,
-    CompileConfig,
     IntegrationConfig,
     NetworkIntegrationConfig,
-    PosixIntegrationConfig,
-    ShellConfig,
-    UnitsConfig,
     WindowsIntegrationConfig,
 )
 
@@ -1054,6 +1047,7 @@ def intercept_command(args, cmd, target_name, capture=False, env=None, data=None
     env['PATH'] = inject_path + os.pathsep + env['PATH']
     env['ANSIBLE_TEST_PYTHON_VERSION'] = version
     env['ANSIBLE_TEST_PYTHON_INTERPRETER'] = interpreter
+    env['ANSIBLE_TEST_PYTHON_INTERPRETER'] = ""
 
     config = dict(
         python_interpreter=interpreter,
