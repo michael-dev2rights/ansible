@@ -1,0 +1,9 @@
+---
+# defaults file for test_rds
+rds_instance_name: '{{resource_prefix}}-rds'
+lambda_function_name: ansible-test-carla-45011713
+rds_instance_name: ansible-test-carla-25897780-rds
+# rds_instance_name: "{{ rds_instance.instances[0].instance_id }}"
+region: "us-east-1"
+endpoint: ansible-test-carla-25897780-rds.coi1wqsjwe32.us-east-1.rds.amazonaws.com
+#endpoint: "{{ rds_instance.endpoint }}"
